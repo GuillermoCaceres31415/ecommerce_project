@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>E-commerce Client</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 15px; }
+        .product { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px; background: #fafafa; }
+        button { padding: 12px 20px; margin: 5px; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-success { background-color: #28a745; color: white; }
+        .btn-warning { background-color: #ffc107; color: black; }
+        .btn-danger { background-color: #dc3545; color: white; }
+        button:hover { opacity: 0.9; }
+        input { padding: 12px; margin: 5px; width: 250px; border: 1px solid #ddd; border-radius: 4px; }
+        .section { margin: 20px 0; }
+        .hidden { display: none; }
+        .error { color: red; margin: 10px 0; }
+        .success { color: green; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>E-commerce Platform</h1>
+
+        <!-- Login/Register Form -->
+        <div id="authSection">
+            <div id="loginForm">
+                <h3>Login</h3>
+                <div class="form-group">
+                    <input type="email" id="loginEmail" placeholder="Email" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" id="loginPassword" placeholder="Password" required>
+                </div>
+                <button class="btn-primary" onclick="login()">Login</button>
+                <button class="btn-success" onclick="showRegisterForm()">Vai alla Registrazione</button>
+                <div id="loginError" class="error hidden"></div>
+            </div>
+
+            <div id="registerForm" class="hidden">
+                <h3>Registrazione</h3>
+                <div class="form-group">
+                    <input type="text" id="registerUsername" placeholder="Username" required>
+                </div>
+                <div class="form-group">
+                    <input type="email" id="registerEmail" placeholder="Email" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" id="registerPassword" placeholder="Password" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" id="registerPasswordConfirm" placeholder="Conferma Password" required>
+                </div>
+                <button class="btn-success" onclick="register()">Register</button>
+                <button class="btn-warning" onclick="showLoginForm()">Torna al Login</button>
+                <div id="registerError" class="error hidden"></div>
+                <div id="registerSuccess" class="success hidden"></div>
+            </div>
+        </div>
+
+        <!-- Products Section -->
+        <div id="productsSection" class="hidden">
+            <div class="section">
+                <h3>Prodotti Disponibili</h3>
+                <div id="products"></div>
+                <button class="btn-warning" onclick="viewCart()">Visualizza Carrello</button>
+                <button class="btn-danger" onclick="logout()">Logout</button>
+            </div>
+        </div>
+
+        <!-- Cart Section -->
+        <div id="cartSection" class="hidden">
+            <div class="section">
+                <h3>Il Tuo Carrello</h3>
+                <div id="cart"></div>
+                <div style="margin-top: 20px;">
+                    <button class="btn-success" onclick="createOrder()">Crea Ordine</button>
+                    <button class="btn-primary" onclick="backToProducts()">Torna ai Prodotti</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        let token = localStorage.getItem('token');
+
+        // Funzioni per gestire le sezioni
+        function showLoginForm() {
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('registerForm').classList.add('hidden');
+            clearErrors();
+        }
+
+        function showRegisterForm() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.remove('hidden');
+            clearErrors();
+        }
+
+        function clearErrors() {
+            document.getElementById('loginError').classList.add('hidden');
+            document.getElementById('registerError').classList.add('hidden');
+            document.getElementById('registerSuccess').classList.add('hidden');
+        }
+
+        // Funzione di login
+        async function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            if (!email || !password) {
+                showError('loginError', 'Inserisci email e password');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/login/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    token = data.access;
+                    localStorage.setItem('token', token);
+                    showProducts();
+                } else {
+                    showError('loginError', data.detail || 'Login fallito');
+                }
+            } catch (error) {
+                showError('loginError', 'Errore di connessione');
+            }
+        }
+
+        // Funzione di registrazione
+        async function register() {
+            const username = document.getElementById('registerUsername').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
+
+            // Validazione
+            if (!username || !email || !password || !passwordConfirm) {
+                showError('registerError', 'Compila tutti i campi');
+                return;
+            }
+
+            if (password !== passwordConfirm) {
+                showError('registerError', 'Le password non corrispondono');
+                return;
+            }
+
+            if (password.length < 6) {
+                showError('registerError', 'La password deve essere di almeno 6 caratteri');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/register/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username,
+                        email,
+                        password
+                    })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showSuccess('registerSuccess', 'Registrazione completata! Puoi fare il login.');
+                    // Pulisci i campi
+                    document.getElementById('registerUsername').value = '';
+                    document.getElementById('registerEmail').value = '';
+                    document.getElementById('registerPassword').value = '';
+                    document.getElementById('registerPasswordConfirm').value = '';
+
+                    // Torna al login dopo 2 secondi
+                    setTimeout(() => {
+                        showLoginForm();
+                    }, 2000);
+                } else {
+                    showError('registerError', data.detail || 'Registrazione fallita');
+                }
+            } catch (error) {
+                showError('registerError', 'Errore di connessione');
+            }
+        }
+
+        // Funzioni di utilità per mostrare errori e successi
+        function showError(elementId, message) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.classList.remove('hidden');
+        }
+
+        function showSuccess(elementId, message) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.classList.remove('hidden');
+        }
+
+        // Caricamento prodotti
+        async function loadProducts() {
+            try {
+                const response = await fetch(`${API_BASE}/products/`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const data = await response.json();
+                const products = data.results || data; // Gestisce sia paginazione che lista diretta
+                const productsDiv = document.getElementById('products');
+                productsDiv.innerHTML = '';
+
+                if (products.length === 0) {
+                    productsDiv.innerHTML = '<p>Nessun prodotto disponibile</p>';
+                    return;
+                }
+
+                products.forEach(product => {
+                    productsDiv.innerHTML += `
+                        <div class="product">
+                            <h4>${product.name}</h4>
+                            <p>${product.description}</p>
+                            <p><strong>Prezzo: €${product.price}</strong></p>
+                            <p>Disponibili: ${product.stock_quantity}</p>
+                            <button class="btn-primary" onclick="addToCart(${product.id})"
+                                    ${product.stock_quantity === 0 ? 'disabled' : ''}>
+                                ${product.stock_quantity === 0 ? 'Non Disponibile' : 'Aggiungi al Carrello'}
+                            </button>
+                        </div>
+                    `;
+                });
+            } catch (error) {
+                document.getElementById('products').innerHTML = '<p>Errore nel caricamento dei prodotti</p>';
+            }
+        }
+
+        // Aggiunta al carrello
+        async function addToCart(productId) {
+            try {
+                const response = await fetch(`${API_BASE}/cart/add/${productId}/`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    alert('Prodotto aggiunto al carrello!');
+                } else {
+                    const data = await response.json();
+                    alert(data.detail || 'Errore nell\'aggiungere al carrello');
+                }
+            } catch (error) {
+                alert('Errore nell\'aggiungere al carrello');
+            }
+        }
+
+        // Visualizzazione carrello
+        async function viewCart() {
+            try {
+                const response = await fetch(`${API_BASE}/cart/`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const cartData = await response.json();
+                const cartDiv = document.getElementById('cart');
+
+                if (!cartData.items || cartData.items.length === 0) {
+                    cartDiv.innerHTML = '<p>Il carrello è vuoto</p>';
+                } else {
+                    let cartHTML = '<h4>Articoli nel carrello:</h4>';
+                    let total = 0;
+
+                    cartData.items.forEach(item => {
+                        const itemTotal = item.quantity * item.product.price;
+                        total += itemTotal;
+                        cartHTML += `
+                            <div class="product">
+                                <h5>${item.product.name}</h5>
+                                <p>Quantità: ${item.quantity}</p>
+                                <p>Prezzo unitario: €${item.product.price}</p>
+                                <p>Totale: €${itemTotal.toFixed(2)}</p>
+                            </div>
+                        `;
+                    });
+
+                    cartHTML += `<h4>Totale carrello: €${total.toFixed(2)}</h4>`;
+                    cartDiv.innerHTML = cartHTML;
+                }
+
+                showCartSection();
+            } catch (error) {
+                alert('Errore nel caricamento del carrello');
+            }
+        }
+
+        // Creazione ordine
+        async function createOrder() {
+            try {
+                const response = await fetch(`${API_BASE}/orders/`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    alert('Ordine creato con successo!');
+                    backToProducts();
+                } else {
+                    alert('Errore nella creazione dell\'ordine');
+                }
+            } catch (error) {
+                alert('Errore nella creazione dell\'ordine');
+            }
+        }
+
+        // Navigazione tra sezioni
+        function showProducts() {
+            document.getElementById('authSection').classList.add('hidden');
+            document.getElementById('productsSection').classList.remove('hidden');
+            document.getElementById('cartSection').classList.add('hidden');
+            loadProducts();
+        }
+
+        function showCartSection() {
+            document.getElementById('productsSection').classList.add('hidden');
+            document.getElementById('cartSection').classList.remove('hidden');
+        }
+
+        function backToProducts() {
+            document.getElementById('cartSection').classList.add('hidden');
+            document.getElementById('productsSection').classList.remove('hidden');
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            token = null;
+            document.getElementById('authSection').classList.remove('hidden');
+            document.getElementById('productsSection').classList.add('hidden');
+            document.getElementById('cartSection').classList.add('hidden');
+            showLoginForm();
+        }
+
+        // Controllo login all'avvio
+        if (token) {
+            showProducts();
+        } else {
+            showLoginForm();
+        }
+    </script>
+</body>
+</html>
