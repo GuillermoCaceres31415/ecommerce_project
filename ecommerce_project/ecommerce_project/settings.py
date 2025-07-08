@@ -25,7 +25,11 @@ SECRET_KEY = 'django-insecure-jhf=elcldji&zd-$0-687%)^kkr40n@irg#j*j&#cl7+-)xx@x
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "ecommerceproject-production-f593.up.railway.app",
+]
 
 # JWT Configuration
 from datetime import timedelta
