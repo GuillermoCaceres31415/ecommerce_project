@@ -75,10 +75,19 @@
             <div class="section">
                 <h3>Il Tuo Carrello</h3>
                 <div id="cart"></div>
+
                 <div style="margin-top: 20px;">
+                    <input
+                      type="text"
+                      id="shippingAddress"
+                      placeholder="Inserisci indirizzo di spedizione"
+                      style="padding:10px; width:60%; margin-right:10px;"
+                      required
+                    />
                     <button class="btn-success" onclick="createOrder()">Crea Ordine</button>
                     <button class="btn-primary" onclick="backToProducts()">Torna ai Prodotti</button>
                 </div>
+
             </div>
         </div>
     </div>
@@ -300,22 +309,33 @@
 
         // Creazione ordine
         async function createOrder() {
-            try {
-                const response = await fetch(`${API_BASE}/orders/`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                if (response.ok) {
-                    alert('Ordine creato con successo!');
-                    backToProducts();
-                } else {
-                    alert('Errore nella creazione dell\'ordine');
-                }
-            } catch (error) {
-                alert('Errore nella creazione dell\'ordine');
-            }
+    const shippingAddress = document.getElementById('shippingAddress').value.trim();
+        if (!shippingAddress) {
+            return alert('Devi inserire un indirizzo di spedizione');
         }
+
+        try {
+            const response = await fetch(`${API_BASE}/orders/create/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ shipping_address: shippingAddress })
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                alert('Ordine creato con successo! ID: ' + data.order_id);
+                backToProducts();
+            } else {
+                alert(data.error || 'Errore nella creazione dell\'ordine');
+            }
+        } catch (error) {
+            alert('Errore di connessione durante la creazione dell\'ordine');
+        }
+    }
+
 
         // Navigazione tra sezioni
         function showProducts() {
