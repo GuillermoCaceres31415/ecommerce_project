@@ -22,7 +22,9 @@ This is a simple e-commerce web app where users can:
   
 4. **Extra**
    -If you want to test the functioning of the moderator user, use the following credentials:
+   
    email: joe@gmail.com
+   
    password: joe12345
 
 ## Getting Started
