@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
     <title>E-commerce Client</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
@@ -18,6 +19,8 @@
         .hidden { display: none; }
         .error { color: red; margin: 10px 0; }
         .success { color: green; margin: 10px 0; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
     </style>
 </head>
 <body>
@@ -64,10 +67,17 @@
         <div id="productsSection" class="hidden">
             <div class="section">
                 <h3>Prodotti Disponibili</h3>
+                <button id="manageUsersBtn" class="btn-warning hidden">Manage Users</button>
                 <div id="products"></div>
                 <button class="btn-warning" onclick="viewCart()">Visualizza Carrello</button>
                 <button class="btn-danger" onclick="logout()">Logout</button>
             </div>
+        </div>
+
+        <!-- Manage Users Section -->
+        <div id="manageUsersSection" class="section hidden">
+            <h2>Manage Users</h2>
+            <div id="usersList"></div>
         </div>
 
         <!-- Cart Section -->
@@ -75,19 +85,11 @@
             <div class="section">
                 <h3>Il Tuo Carrello</h3>
                 <div id="cart"></div>
-
                 <div style="margin-top: 20px;">
-                    <input
-                      type="text"
-                      id="shippingAddress"
-                      placeholder="Inserisci indirizzo di spedizione"
-                      style="padding:10px; width:60%; margin-right:10px;"
-                      required
-                    />
+                    <input type="text" id="shippingAddress" placeholder="Inserisci indirizzo di spedizione" required>
                     <button class="btn-success" onclick="createOrder()">Crea Ordine</button>
                     <button class="btn-primary" onclick="backToProducts()">Torna ai Prodotti</button>
                 </div>
-
             </div>
         </div>
     </div>
@@ -96,280 +98,279 @@
         const API_BASE = 'http://localhost:8000/api';
         let token = localStorage.getItem('token');
 
-        // Funzioni per gestire le sezioni
+        // Show / Hide forms
         function showLoginForm() {
             document.getElementById('loginForm').classList.remove('hidden');
             document.getElementById('registerForm').classList.add('hidden');
             clearErrors();
         }
-
         function showRegisterForm() {
             document.getElementById('loginForm').classList.add('hidden');
             document.getElementById('registerForm').classList.remove('hidden');
             clearErrors();
         }
-
         function clearErrors() {
-            document.getElementById('loginError').classList.add('hidden');
-            document.getElementById('registerError').classList.add('hidden');
-            document.getElementById('registerSuccess').classList.add('hidden');
+            document.querySelectorAll('.error, .success').forEach(el => el.classList.add('hidden'));
         }
 
-        // Funzione di login
+        // Login
         async function login() {
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
-
-            if (!email || !password) {
-                showError('loginError', 'Inserisci email e password');
-                return;
-            }
+            if (!email || !password) return showError('loginError', 'Inserisci email e password');
 
             try {
-                const response = await fetch(`${API_BASE}/auth/login/`, {
+                const res = await fetch(`${API_BASE}/auth/login/`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({email, password})
                 });
+                const data = await res.json();
+                if (!res.ok) return showError('loginError', data.detail || 'Login fallito');
 
-                const data = await response.json();
-                if (response.ok) {
-                    token = data.access;
-                    localStorage.setItem('token', token);
-                    showProducts();
-                } else {
-                    showError('loginError', data.detail || 'Login fallito');
-                }
-            } catch (error) {
+                token = data.access;
+                localStorage.setItem('token', token);
+                await showProducts();
+            } catch {
                 showError('loginError', 'Errore di connessione');
             }
         }
 
-        // Funzione di registrazione
+        // Register
         async function register() {
-            const username = document.getElementById('registerUsername').value;
-            const email = document.getElementById('registerEmail').value;
-            const password = document.getElementById('registerPassword').value;
-            const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
-
-            // Validazione
-            if (!username || !email || !password || !passwordConfirm) {
-                showError('registerError', 'Compila tutti i campi');
-                return;
-            }
-
-            if (password !== passwordConfirm) {
-                showError('registerError', 'Le password non corrispondono');
-                return;
-            }
-
-            if (password.length < 6) {
-                showError('registerError', 'La password deve essere di almeno 6 caratteri');
-                return;
-            }
+            const u = document.getElementById('registerUsername').value;
+            const e = document.getElementById('registerEmail').value;
+            const p = document.getElementById('registerPassword').value;
+            const c = document.getElementById('registerPasswordConfirm').value;
+            if (!u||!e||!p||!c) return showError('registerError','Compila tutti i campi');
+            if (p!==c) return showError('registerError','Le password non corrispondono');
+            if (p.length<6) return showError('registerError','Password di almeno 6 caratteri');
 
             try {
-                const response = await fetch(`${API_BASE}/auth/register/`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        username,
-                        email,
-                        password
-                    })
+                const res = await fetch(`${API_BASE}/auth/register/`, {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({username:u,email:e,password:p})
                 });
+                const data = await res.json();
+                if (!res.ok) return showError('registerError',data.detail||'Registrazione fallita');
 
-                const data = await response.json();
-                if (response.ok) {
-                    showSuccess('registerSuccess', 'Registrazione completata! Puoi fare il login.');
-                    // Pulisci i campi
-                    document.getElementById('registerUsername').value = '';
-                    document.getElementById('registerEmail').value = '';
-                    document.getElementById('registerPassword').value = '';
-                    document.getElementById('registerPasswordConfirm').value = '';
-
-                    // Torna al login dopo 2 secondi
-                    setTimeout(() => {
-                        showLoginForm();
-                    }, 2000);
-                } else {
-                    showError('registerError', data.detail || 'Registrazione fallita');
-                }
-            } catch (error) {
-                showError('registerError', 'Errore di connessione');
+                showSuccess('registerSuccess','Registrazione completata! Effettua il login.');
+                ['registerUsername','registerEmail','registerPassword','registerPasswordConfirm']
+                  .forEach(id=>document.getElementById(id).value='');
+                setTimeout(showLoginForm,2000);
+            } catch {
+                showError('registerError','Errore di connessione');
             }
         }
 
-        // Funzioni di utilità per mostrare errori e successi
-        function showError(elementId, message) {
-            const element = document.getElementById(elementId);
-            element.textContent = message;
-            element.classList.remove('hidden');
+        // Utility messages
+        function showError(id,msg) {
+            const el = document.getElementById(id);
+            el.textContent = msg;
+            el.classList.remove('hidden');
+        }
+        function showSuccess(id,msg) {
+            const el = document.getElementById(id);
+            el.textContent = msg;
+            el.classList.remove('hidden');
         }
 
-        function showSuccess(elementId, message) {
-            const element = document.getElementById(elementId);
-            element.textContent = message;
-            element.classList.remove('hidden');
-        }
-
-        // Caricamento prodotti
+        // Load products
         async function loadProducts() {
             try {
-                const response = await fetch(`${API_BASE}/products/`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                const res = await fetch(`${API_BASE}/products/`, {
+                    headers: {'Authorization':`Bearer ${token}`}
                 });
-
-                const data = await response.json();
-                const products = data.results || data; // Gestisce sia paginazione che lista diretta
-                const productsDiv = document.getElementById('products');
-                productsDiv.innerHTML = '';
-
-                if (products.length === 0) {
-                    productsDiv.innerHTML = '<p>Nessun prodotto disponibile</p>';
-                    return;
-                }
-
-                products.forEach(product => {
-                    productsDiv.innerHTML += `
+                const data = await res.json();
+                const list = data.results||data;
+                const cont = document.getElementById('products');
+                cont.innerHTML = list.length
+                    ? list.map(p=>`
                         <div class="product">
-                            <h4>${product.name}</h4>
-                            <p>${product.description}</p>
-                            <p><strong>Prezzo: €${product.price}</strong></p>
-                            <p>Disponibili: ${product.stock_quantity}</p>
-                            <button class="btn-primary" onclick="addToCart(${product.id})"
-                                    ${product.stock_quantity === 0 ? 'disabled' : ''}>
-                                ${product.stock_quantity === 0 ? 'Non Disponibile' : 'Aggiungi al Carrello'}
-                            </button>
-                        </div>
-                    `;
-                });
-            } catch (error) {
-                document.getElementById('products').innerHTML = '<p>Errore nel caricamento dei prodotti</p>';
+                          <h4>${p.name}</h4>
+                          <p>${p.description}</p>
+                          <p><strong>€${p.price}</strong></p>
+                          <p>Disponibili: ${p.stock_quantity}</p>
+                          <button class="btn-primary" onclick="addToCart(${p.id})"
+                            ${p.stock_quantity===0?'disabled':''}>
+                            ${p.stock_quantity===0?'Non Disponibile':'Aggiungi al Carrello'}
+                          </button>
+                        </div>`).join('')
+                    : '<p>Nessun prodotto disponibile</p>';
+            } catch {
+                document.getElementById('products').innerHTML = '<p>Errore caricamento prodotti</p>';
             }
         }
 
-        // Aggiunta al carrello
-        async function addToCart(productId) {
+        // Add to cart
+        async function addToCart(id) {
             try {
-                const response = await fetch(`${API_BASE}/cart/add/${productId}/`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
+                const res = await fetch(`${API_BASE}/cart/add/${id}/`, {
+                    method:'POST',
+                    headers:{'Authorization':`Bearer ${token}`}
                 });
-
-                if (response.ok) {
-                    alert('Prodotto aggiunto al carrello!');
-                } else {
-                    const data = await response.json();
-                    alert(data.detail || 'Errore nell\'aggiungere al carrello');
+                if (!res.ok) {
+                    const d = await res.json();
+                    return alert(d.detail||'Errore aggiunta carrello');
                 }
-            } catch (error) {
-                alert('Errore nell\'aggiungere al carrello');
+                alert('Prodotto aggiunto!');
+            } catch {
+                alert('Errore aggiunta carrello');
             }
         }
 
-        // Visualizzazione carrello
+        // View cart
         async function viewCart() {
             try {
-                const response = await fetch(`${API_BASE}/cart/`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                const res = await fetch(`${API_BASE}/cart/`, {
+                    headers:{'Authorization':`Bearer ${token}`}
                 });
-
-                const cartData = await response.json();
+                const d = await res.json();
                 const cartDiv = document.getElementById('cart');
-
-                if (!cartData.items || cartData.items.length === 0) {
-                    cartDiv.innerHTML = '<p>Il carrello è vuoto</p>';
+                if (!d.items||!d.items.length) {
+                    cartDiv.innerHTML = '<p>Carrello vuoto</p>';
                 } else {
-                    let cartHTML = '<h4>Articoli nel carrello:</h4>';
-                    let total = 0;
-
-                    cartData.items.forEach(item => {
-                        const itemTotal = item.quantity * item.product.price;
-                        total += itemTotal;
-                        cartHTML += `
-                            <div class="product">
-                                <h5>${item.product.name}</h5>
-                                <p>Quantità: ${item.quantity}</p>
-                                <p>Prezzo unitario: €${item.product.price}</p>
-                                <p>Totale: €${itemTotal.toFixed(2)}</p>
-                            </div>
-                        `;
+                    let html = '<h4>Articoli nel carrello:</h4>';
+                    let tot = 0;
+                    d.items.forEach(it=>{
+                        const sub = it.quantity * it.product.price;
+                        tot += sub;
+                        html += `
+                          <div class="product">
+                            <h5>${it.product.name}</h5>
+                            <p>Quantità: ${it.quantity}</p>
+                            <p>Unitario: €${it.product.price}</p>
+                            <p>Sub: €${sub.toFixed(2)}</p>
+                          </div>`;
                     });
-
-                    cartHTML += `<h4>Totale carrello: €${total.toFixed(2)}</h4>`;
-                    cartDiv.innerHTML = cartHTML;
+                    html += `<h4>Totale: €${tot.toFixed(2)}</h4>`;
+                    cartDiv.innerHTML = html;
                 }
-
-                showCartSection();
-            } catch (error) {
-                alert('Errore nel caricamento del carrello');
+                document.getElementById('productsSection').classList.add('hidden');
+                document.getElementById('manageUsersSection').classList.add('hidden');
+                document.getElementById('cartSection').classList.remove('hidden');
+            } catch {
+                alert('Errore caricamento carrello');
             }
         }
 
-        // Creazione ordine
+        // Create order
         async function createOrder() {
-    const shippingAddress = document.getElementById('shippingAddress').value.trim();
-        if (!shippingAddress) {
-            return alert('Devi inserire un indirizzo di spedizione');
-        }
-
-        try {
-            const response = await fetch(`${API_BASE}/orders/create/`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ shipping_address: shippingAddress })
-            });
-
-            const data = await response.json();
-            if (response.ok) {
-                alert('Ordine creato con successo! ID: ' + data.order_id);
-                backToProducts();
-            } else {
-                alert(data.error || 'Errore nella creazione dell\'ordine');
+            const addr = document.getElementById('shippingAddress').value.trim();
+            if (!addr) return alert('Inserisci indirizzo di spedizione');
+            try {
+                const res = await fetch(`${API_BASE}/orders/create/`, {
+                    method:'POST',
+                    headers:{
+                        'Authorization':`Bearer ${token}`,
+                        'Content-Type':'application/json'
+                    },
+                    body: JSON.stringify({shipping_address: addr})
+                });
+                const d = await res.json();
+                if (!res.ok) return alert(d.error||'Errore creazione ordine');
+                alert('Ordine creato! ID: '+d.order_id);
+                await showProducts();
+            } catch {
+                alert('Errore connessione ordine');
             }
-        } catch (error) {
-            alert('Errore di connessione durante la creazione dell\'ordine');
         }
-    }
 
-
-        // Navigazione tra sezioni
-        function showProducts() {
+        // Show products & manage-users
+        async function showProducts() {
             document.getElementById('authSection').classList.add('hidden');
-            document.getElementById('productsSection').classList.remove('hidden');
             document.getElementById('cartSection').classList.add('hidden');
-            loadProducts();
+            document.getElementById('manageUsersSection').classList.add('hidden');
+            document.getElementById('productsSection').classList.remove('hidden');
+            await loadProducts();
+
+            // Check moderator
+            try {
+                const res = await fetch(`${API_BASE}/auth/profile/`, {
+                    headers:{'Authorization':`Bearer ${token}`}
+                });
+                const me = await res.json();
+                const btn = document.getElementById('manageUsersBtn');
+                if (me.is_moderator) {
+                    btn.classList.remove('hidden');
+                    btn.onclick = showManageUsers;
+                } else {
+                    btn.classList.add('hidden');
+                }
+            } catch {
+                // ignore
+            }
         }
 
-        function showCartSection() {
+        // Manage users
+        function showManageUsers() {
             document.getElementById('productsSection').classList.add('hidden');
-            document.getElementById('cartSection').classList.remove('hidden');
-        }
-
-        function backToProducts() {
             document.getElementById('cartSection').classList.add('hidden');
-            document.getElementById('productsSection').classList.remove('hidden');
+            document.getElementById('manageUsersSection').classList.remove('hidden');
+            loadUsers();
+        }
+        async function loadUsers() {
+            try {
+                const res = await fetch(`${API_BASE}/auth/users/`, {
+                    headers:{'Authorization':`Bearer ${token}`}
+                });
+                const users = await res.json();
+                const cont = document.getElementById('usersList');
+                if (!users.length) {
+                    cont.innerHTML = '<p>Nessun utente trovato</p>';
+                    return;
+                }
+                cont.innerHTML = `
+                    <table>
+                      <tr><th>ID</th><th>Email</th><th>Username</th><th>Banned</th><th>Action</th></tr>
+                      ${users.map(u=>`
+                        <tr>
+                          <td>${u.id}</td>
+                          <td>${u.email}</td>
+                          <td>${u.username}</td>
+                          <td>${u.is_banned}</td>
+                          <td>
+                            <button onclick="toggleBan(${u.id},${u.is_banned})" class="btn-danger">
+                              ${u.is_banned?'Unban':'Ban'}
+                            </button>
+                          </td>
+                        </tr>`).join('')}
+                    </table>`;
+            } catch {
+                document.getElementById('usersList').innerHTML = '<p>Errore caricamento utenti</p>';
+            }
+        }
+        async function toggleBan(id, banned) {
+            await fetch(`${API_BASE}/auth/users/${id}/`, {
+                method:'PATCH',
+                headers:{
+                    'Authorization':`Bearer ${token}`,
+                    'Content-Type':'application/json'
+                },
+                body: JSON.stringify({is_banned: !banned})
+            });
+            loadUsers();
         }
 
+        // Logout
         function logout() {
             localStorage.removeItem('token');
             token = null;
-            document.getElementById('authSection').classList.remove('hidden');
             document.getElementById('productsSection').classList.add('hidden');
             document.getElementById('cartSection').classList.add('hidden');
+            document.getElementById('manageUsersSection').classList.add('hidden');
             showLoginForm();
         }
 
-        // Controllo login all'avvio
-        if (token) {
-            showProducts();
-        } else {
-            showLoginForm();
-        }
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            if (token) {
+                showProducts();
+            } else {
+                showLoginForm();
+            }
+        });
     </script>
 </body>
 </html>
